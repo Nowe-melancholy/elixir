@@ -1,19 +1,29 @@
 version: '3.2'
 services:
-  web:
+  elixir:
+    container_name: elixir
     build: ./src
     ports:
       - '4000:4000'
     command: mix phx.server
+    #command: mix deps.update --all
     environment:
       - MIX_ENV=dev
       - PORT=4000
+    depends_on:
+      - postgres
     volumes:
       - ./src:/app
 
-  db:
+  postgres:
     image: postgres
+    container_name: postgres
+    ports:
+      - 5432:5432
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_HOST=db
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    hostname: postgres
+    restart: always
+    user: root

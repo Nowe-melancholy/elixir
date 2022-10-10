@@ -1,4 +1,4 @@
-defmodule MyApp.DataCase do
+defmodule Myapp.DataCase do
   @moduledoc """
   This module defines the setup for tests requiring
   access to the application's data layer.
@@ -7,32 +7,37 @@ defmodule MyApp.DataCase do
   your tests.
 
   Finally, if the test case interacts with the database,
-  it cannot be async. For this reason, every test runs
-  inside a transaction which is reset at the beginning
-  of the test unless the test case is marked as async.
+  we enable the SQL sandbox, so changes done to the database
+  are reverted at the end of every test. If you are using
+  PostgreSQL, you can even run database tests asynchronously
+  by setting `use Myapp.DataCase, async: true`, although
+  this option is not recommended for other databases.
   """
 
   use ExUnit.CaseTemplate
 
   using do
     quote do
-      alias MyApp.Repo
+      alias Myapp.Repo
 
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
-      import MyApp.DataCase
+      import Myapp.DataCase
     end
   end
 
   setup tags do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(MyApp.Repo)
-
-    unless tags[:async] do
-      Ecto.Adapters.SQL.Sandbox.mode(MyApp.Repo, {:shared, self()})
-    end
-
+    Myapp.DataCase.setup_sandbox(tags)
     :ok
+  end
+
+  @doc """
+  Sets up the sandbox based on the test tags.
+  """
+  def setup_sandbox(tags) do
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Myapp.Repo, shared: not tags[:async])
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
   end
 
   @doc """
@@ -45,8 +50,8 @@ defmodule MyApp.DataCase do
   """
   def errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
-      Enum.reduce(opts, message, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
+      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
+        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
       end)
     end)
   end
